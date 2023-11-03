@@ -46,23 +46,27 @@ class Boundary():
 
         return x5 + x6 - (x5**n + x6**n)**(1/n)
     
+
 class Kernell():
     """ Particle kernel class 
     """ 
 
     def __init__(self, kern_type, h) -> None:
+
+        self.h = h
+
         if kern_type == "cubicspline":
-            self.kernel     = lambda x : self.cubicspline(self.kernelValidation(x, h))
-            self.dkernel    = lambda x : self.dcubicspline(self.kernelValidation(x, h))
+            self.k     = lambda x : self.cubicspline(*self.kernelValidation(x, self.h))
+            self.dk    = lambda x : self.dcubicspline(*self.kernelValidation(x, self.h))
 
         elif kern_type == "gaussian":
             raise NotImplementedError("Gaussian kernel not implemented")
-            self.kernel     = lambda x : self.gaussian(self.kernelValidation(x, h))
-            self.dkernel    = lambda x : self.dgaussian(self.kernelValidation(x, h))
+            self.k     = lambda x : self.gaussian(*self.kernelValidation(x, self.h))
+            self.dk    = lambda x : self.dgaussian(*self.kernelValidation(x, self.h))
 
         elif kern_type == 'triangular':
-            self.kernel     = lambda x : self.triangular(self.kernelValidation(x, h))
-            self.dkernel    = lambda x : self.dtriangular(self.kernelValidation(x, h))
+            self.k     = lambda x : self.triangular(*self.kernelValidation(x, self.h))
+            self.dk    = lambda x : self.dtriangular(*self.kernelValidation(x, self.h))
 
         else:
             raise NotImplementedError(f" '{kern_type}' kernel not implemented")
@@ -205,51 +209,83 @@ class Fields():
     """ 
     """
 
-    def __init__(self, kernel) -> None:
+    def __init__(self, kernel, solver_settings) -> None:
 
         self.psi = { 'x':    0.5*np.random.random((solver_settings['n_particles'],2))-0.25,
-                     'rho':  np.ones(solver_settings['n_particles'], 1),
-                     'm':    np.ones(solver_settings['n_particles'], 1),
+                     'rho':  0.1*np.ones((solver_settings['n_particles'], 1)),
+                     'm':    np.ones((solver_settings['n_particles'], 1)),
                      'u':    np.random.random((solver_settings['n_particles'],2)),
-                     'p':    np.zeros(solver_settings['n_particles'], 1)}
+                     'p':    0.1*np.zeros((solver_settings['n_particles'], 1))}
         self.kernel = kernel
 
     def sph(self, fld, xi):
+        """ Return a vector field, apporximated using the SPH discretization. 
         
-        phi = 0.0
-        for m, rho, x, fld in zip(self.psi['m'],self.psi['rho'],self.psi['x'],self.psi[fld]):
+        Arguments
+        ----------
+        fld: str
+            Field to be evaluated
+        xi: ndarray
+            Evaluation points
+        
+        Parameters
+        ----------
+        
+        Returns
+        -------
+        phi: ndarray
+            Vector field
+        
+        Notes
+        ----- 
+        
+        """ 
+        
+        m, rho, x, fld = self.psi['m'],self.psi['rho'],self.psi['x'],self.psi[fld]
 
-            phi = phi + m/rho*fld*kernel.kernel(np.linalg.norm(xi-x, axis=1))
+        phi = []
 
-        return phi
+        for xii in xi:
+            phi.append(np.sum(m/rho*fld*self.kernel.k(np.linalg.norm(xii[np.newaxis,:]-x, axis=1))[:,np.newaxis], axis=0))
+
+        return np.array(phi)
 
     def grad_sph(self, fld, xi):
-
+        """ Return the gradient of a scalar field, approximated using the SPH discretization . 
+        """ 
         n = xi/np.linalg.norm(xi, axis=1)[:,None]
-        phi = 0.0
-        for m, rho, x, fld in zip(self.psi['m'],self.psi['rho'],self.psi['x'],self.psi[fld]):
+        m, rho, x, fld = self.psi['m'],self.psi['rho'],self.psi['x'],self.psi[fld]
 
-            phi = phi + m/rho*fld*kernel.dkernel(np.linalg.norm(xi-x, axis=1))
+        assert fld.shape[1] == 1, "fld must be a scalar field"
 
-        return np.tile(phi[np.newaxis,:],(2,1)).T*n
+        phi = []
+        for xii, nii in zip(xi, n):
+            dk = np.tile(self.kernel.dk(np.linalg.norm(xii[np.newaxis,:]-x, axis=1))[:,np.newaxis],(1, 2))*nii
+            phi.append(np.sum(m/rho*fld*dk, axis=0))
+
+        return np.array(phi)
 
     def div_sph(self, fld, xi):
+        """ Return the divergence of a vector field, approximated using the SPH discretization . 
+        """
 
         n = xi/np.linalg.norm(xi, axis=1)[:,None]
         phi = 0.0
         for m, rho, x, fld in zip(self.psi['m'],self.psi['rho'],self.psi['x'],self.psi[fld]):
             fld     = fld[np.newaxis,:]
-            dkern    = np.tile(kernel.dkernel(np.linalg.norm(xi-x, axis=1))[np.newaxis,:],(2,1)).T*n
+            dkern    = np.tile(self.kernel.dk(np.linalg.norm(xi-x, axis=1))[np.newaxis,:],(2,1)).T*n
             phi     = phi + (m/rho) * fld @ (dkern.T)
 
         return phi
 
     # def curl_sph(self, fld, xi):
+        """ Return the curl of a vector field, approximated using the SPH discretization . 
+        """
 
     #     phi = 0.0
     #     for m, rho, x, fld in zip(self.psi['m'],self.psi['rho'],self.psi['x'],self.psi[fld]):
 
-    #         phi = phi + m/rho*fld*kernel.kernel(np.linalg.norm(xi-x, axis=1))
+    #         phi = phi + m/rho*fld*self.kernel.self.kernel(np.linalg.norm(xi-x, axis=1))
 
     #     return phi
 

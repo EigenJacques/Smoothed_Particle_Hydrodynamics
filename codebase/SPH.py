@@ -16,10 +16,10 @@ from scipy.stats.qmc import Sobol
 from SPH_core import Kernell, Boundary, Fields, Physics, TimeIntegration
 
 # %%
-solver_settings = {"h": 0.1,"n_particles": 50, "dt": 0.01, "t_max": 1.0}
-kernel      = Kernell('triangular', 0.2)
+solver_settings = {"h": 0.1, "n_particles": 40, "dt": 0.0005, "t_max": 1.0, 'gamma':1.4, "rho":1, "m":0.001}
+kernel      = Kernell('cubicspline', solver_settings['h'])
 fields      = Fields(kernel, solver_settings)
-physics     = Physics()
+physics     = Physics(solver_settings['gamma'])
 itegr       = TimeIntegration(solver_settings['dt'], fields, physics)
 
 # %%
@@ -38,9 +38,9 @@ sc = plt.pcolormesh(x,y,Y[:,0].reshape(100,100))
 plt.xlim(-0.5,0.5)
 plt.ylim(-0.5,0.5)
 plt.colorbar(sc)
-#%%
+
 plt.figure()
-for i in range(10):
+for i in range(3):
     itegr.leapFrog()
 Y = fields.density(X)
 sc = plt.scatter(X[:,0],X[:,1], c=Y)
@@ -68,10 +68,10 @@ class AnimatedScatter(object):
         self.stream = self.data_stream()
 
         # Initialize the SPH solver
-        self.solver_settings = {"h": 0.1,"n_particles": 50, "dt": 0.01, "t_max": 1.0}
-        self.kernel     = Kernell('triangular', 0.2)
+        self.solver_settings = {"h": 0.1, "n_particles": 40, "dt": 0.05, "t_max": 1.0, 'gamma':1.4, "rho":1, "m":0.001}
+        self.kernel     = Kernell('cubicspline', self.solver_settings['h'])
         self.fields     = Fields(self.kernel, self.solver_settings)
-        self.physics    = Physics()
+        self.physics    = Physics(self.solver_settings['gamma'])
         self.itegr      = TimeIntegration(self.solver_settings['dt'], self.fields, self.physics)
         # self.X = Sobol(2).random_base2(9)-0.5
 
@@ -85,7 +85,7 @@ class AnimatedScatter(object):
         # Setup the figure and axes...
         self.fig, self.ax = plt.subplots()
         # Then setup FuncAnimation.
-        self.ani = animation.FuncAnimation(self.fig, self.update, interval=5, 
+        self.ani = animation.FuncAnimation(self.fig, self.update, interval=10, 
                                           init_func=self.setup_plot, blit=True)
 
     def setup_plot(self):

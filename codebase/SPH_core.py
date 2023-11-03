@@ -60,7 +60,6 @@ class Kernell():
             self.dk    = lambda x : self.dcubicspline(*self.kernelValidation(x, self.h))
 
         elif kern_type == "gaussian":
-            raise NotImplementedError("Gaussian kernel not implemented")
             self.k     = lambda x : self.gaussian(*self.kernelValidation(x, self.h))
             self.dk    = lambda x : self.dgaussian(*self.kernelValidation(x, self.h))
 
@@ -212,10 +211,11 @@ class Fields():
     def __init__(self, kernel, solver_settings) -> None:
 
         self.psi = { 'x':    0.5*np.random.random((solver_settings['n_particles'],2))-0.25,
-                     'rho':  0.1*np.ones((solver_settings['n_particles'], 1)),
-                     'm':    np.ones((solver_settings['n_particles'], 1)),
-                     'u':    np.random.random((solver_settings['n_particles'],2)),
-                     'p':    0.1*np.zeros((solver_settings['n_particles'], 1))}
+                     'rho':  solver_settings['rho']*np.ones((solver_settings['n_particles'], 1)),
+                     'm':    solver_settings['m']*np.ones((solver_settings['n_particles'], 1)),
+                     'u':    np.zeros((solver_settings['n_particles'],2)),
+                     'e':    0.1*np.ones((solver_settings['n_particles'], 1)),
+                     'mt':   np.ones((solver_settings['n_particles'], 1))}
         self.kernel = kernel
 
     def sph(self, fld, xi):
@@ -303,10 +303,10 @@ class Physics():
     """ 
     """
 
-    def __init__(self, )-> None:
-        pass
+    def __init__(self, gamma)-> None:
+        self.gamma = gamma
 
-    def materialDerivative(self):
+    def materialDerivative(self, rho, e, v, dW, mi, vi, ei, rhoi):
         """ Returns the acceleration vector for each particle . 
         
         Arguments
@@ -324,9 +324,32 @@ class Physics():
         
         """
 
-        a = np.ones((1,2))*-9.81 # Gravity
+        # a = np.array([[0,1]])*-9.81 # Gravity
 
-        return a
+        du = -np.sum(mi*(((self.gamma-1)*e)/rho + ((self.gamma-1)*ei)/rhoi)*dW, axis=0)
+
+        return du
+    
+    def energyConservation(self, rho, e, v, dW, mi, vi):
+        """ Description . 
+        
+        Arguments
+        ----------
+        
+        Parameters
+        ----------
+        
+        Returns
+        -------
+        
+        Notes
+        ----- 
+        
+        """ 
+
+        de = ((self.gamma-1)*e)/rho*np.sum(mi*(vi - v)@dW)
+
+        return de
 
 class TimeIntegration():
     """ Time integration of the SPH equations.
@@ -342,15 +365,25 @@ class TimeIntegration():
         """ 
         """ 
 
-        x, u = self.fields.psi['x'], self.fields.psi['u']
+        # Field vectors
+        rho, m, x, u, e = self.fields.psi['rho'], self.fields.psi['m'], self.fields.psi['x'], self.fields.psi['u'], self.fields.psi['e']
 
-        A = []
-        for xi in xi:
-            A.append(self.physics.materialDerivative(xi))
-        A = np.array(A)
+        # Kernel
+        W   = self.fields.sph("mt",x)
+        dW  = self.fields.grad_sph("mt",x)
+
+        du = []
+        de = []
+        for xj, rhoj, uj, ej, mj, dWj in zip(x, rho, u, e, m, dW):
+            de.append(self.physics.energyConservation(rhoj, ej, uj, dWj, m, u))
+            du.append(self.physics.materialDerivative(rhoj, ej, uj, dWj, m, u, e, rho))
+        du = np.array(du)
+        de = np.array(de)
 
         x = x + self.time_step*u
-        u = u + self.time_step*A
+        u = u + self.time_step*du
+        e = e + self.time_step*de
 
         self.fields.psi['x'] = x
         self.fields.psi['u'] = u
+        self.fields.psi['e'] = e

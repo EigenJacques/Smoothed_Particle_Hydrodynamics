@@ -1,57 +1,30 @@
 #%%
+
+# Imports
+
 import numpy as np
+
 from matplotlib import pyplot as plt
+import matplotlib.cm     as cm
 
+from juliacall import Main
+Main.include("SPH.jl")
+from SPH_core import Kernell, Boundary, Fields
 
-#%%
+# %%
+solver_settings = {"h": 0.1,"n_particles": 50, "dt": 0.01, "t_max": 1.0}
+kernel = Kernell('triangular', 0.2)
+fields = Fields(kernel)
 
-class Boundary():
-    """ 
-    """ 
-
-    def __init__(self, ) -> None:
-        pass
-
-    def upper(self,X, a):
-        return -X[:,1] + a
-
-    def lower(self,X, a):
-        return X[:,1] + a
-
-    def left(self,X,  a):
-        return X[:,0] + a
-
-    def right(self,X, a):
-        return -X[:,0] + a
-
-    def square(self,X):
-        n = 2
-
-        x1 = self.upper(X,0.5)
-        x2 = self.lower(X,0.5)
-        x3 = self.left(X,0.5)
-        x4 = self.right(X,0.5)
-        x5 = (x1 + x2 - (x1**n + x2**n )**(1/n))
-        x6 = (x3 + x4 - (x3**n + x4**n )**(1/n))
-
-        return x5 + x6 - (x5**n + x6**n)**(1/n)
-
-#%%
-x = np.linspace(-1,1,1000)
-y = np.linspace(-1,1,1000)
-x, y = np.meshgrid(x, y)
-
-X = np.vstack((x.flatten(),y.flatten())).T
-
-domain = Boundary().square(X)
-domain = domain.reshape(x.shape)
-
+# %%
 plt.figure()
-plt.contour(x,y,domain,levels=[0.0])
+X = np.random.random((10_000,2))-0.5
+Y = fields.velocity(X)[:,0]
+# Y = fields.div_sph('u',X)
+
+sc = plt.scatter(X[:,0],X[:,1], c=Y)
+plt.xlim(-0.5,0.5)
+plt.ylim(-0.5,0.5)
+plt.colorbar(sc)
 
 # %%
-domain = Boundary()
-%timeit domain.square(X)
-# %%
-
-

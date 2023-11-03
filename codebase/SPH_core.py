@@ -15,6 +15,37 @@ Main.include("SPH.jl")
 # Core code
 #=======================================
 
+class Boundary():
+    """ 
+    """ 
+
+    def __init__(self) -> None:
+        pass
+
+    def upper(self,X, a):
+        return -X[:,1] + a
+
+    def lower(self,X, a):
+        return X[:,1] + a
+
+    def left(self,X,  a):
+        return X[:,0] + a
+
+    def right(self,X, a):
+        return -X[:,0] + a
+
+    def square(self,X):
+        n = 2
+
+        x1 = self.upper(X,0.5)
+        x2 = self.lower(X,0.5)
+        x3 = self.left(X,0.5)
+        x4 = self.right(X,0.5)
+        x5 = (x1 + x2 - (x1**n + x2**n )**(1/n))
+        x6 = (x3 + x4 - (x3**n + x4**n )**(1/n))
+
+        return x5 + x6 - (x5**n + x6**n)**(1/n)
+    
 class Kernell():
     """ Particle kernel class 
     """ 

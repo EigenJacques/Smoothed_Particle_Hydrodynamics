@@ -246,7 +246,8 @@ class Fields():
         phi = []
 
         for xii in xi:
-            phi.append(np.sum(m/rho*fld*self.kernel.k(np.linalg.norm(xii[np.newaxis,:]-x, axis=1))[:,np.newaxis], axis=0))
+            k = self.kernel.k(np.linalg.norm(xii[np.newaxis,:]-x, axis=1))[:,np.newaxis]
+            phi.append(np.sum(m/rho*fld*k, axis=0))
 
         return np.array(phi)
 
@@ -296,3 +297,35 @@ class Fields():
     def velocity(self,xi):
         u = self.sph('u',xi)
         return u
+
+
+class Physics():
+    """ 
+    """
+
+    def __init__(self, )-> None:
+        pass
+
+    def materialDerivative(self):
+        """ Returns the acceleration vector for each particle . 
+        
+        Arguments
+        ----------
+        
+        Parameters
+        ----------
+        
+        Returns
+        -------
+        
+        Notes
+        ----- 
+        a = F/m = d/dt(u) = du/dt + u*grad(u)
+        
+        """
+
+        a = np.ones((1,2))*-9.81 # Gravity
+
+        return a
+
+

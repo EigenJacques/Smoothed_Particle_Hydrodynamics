@@ -16,12 +16,16 @@ from scipy.stats.qmc import Sobol
 from SPH_core import Kernell, Boundary, Fields, Physics, TimeIntegration
 
 # %%
-solver_settings = {"h": 0.1, "n_particles": 40, "dt": 0.0005, "t_max": 1.0, 'gamma':1.4, "rho":1, "m":0.001}
+solver_settings = {"h": 0.1, "n_particles": 100, "dt": 0.0005, "t_max": 1.0, 'gamma':1.4, "rho":1, "m":0.001}
 kernel      = Kernell('cubicspline', solver_settings['h'])
+boundary    = Boundary()
 fields      = Fields(kernel, solver_settings)
-physics     = Physics(solver_settings['gamma'])
-itegr       = TimeIntegration(solver_settings['dt'], fields, physics)
+physics     = Physics(solver_settings['gamma'], boundary)
+itegr       = TimeIntegration(solver_settings['dt'], fields, physics, boundary)
 
+itegr.leapFrog()
+
+# %timeit itegr.leapFrog()
 # %%
 #==================================
 # Static test
@@ -68,12 +72,14 @@ class AnimatedScatter(object):
         self.stream = self.data_stream()
 
         # Initialize the SPH solver
-        self.solver_settings = {"h": 0.1, "n_particles": 40, "dt": 0.05, "t_max": 1.0, 'gamma':1.4, "rho":1.169, "m":0.001}
+        self.solver_settings = {"h": 0.1, "n_particles": 200, "dt": 0.1, "t_max": 1.0, 'gamma':1.4, "rho":1.169, "m":1}
+        self.solver_settings['m'] = self.solver_settings['rho']/(self.solver_settings['n_particles']*(2*self.solver_settings['h'])**2)/1000
+
         self.kernel     = Kernell('cubicspline', self.solver_settings['h'])
+        self.boundary   = Boundary()
         self.fields     = Fields(self.kernel, self.solver_settings)
-        self.physics    = Physics(self.solver_settings['gamma'])
-        self.itegr      = TimeIntegration(self.solver_settings['dt'], self.fields, self.physics)
-        # self.X = Sobol(2).random_base2(9)-0.5
+        self.physics    = Physics(self.solver_settings['gamma'], self.boundary)
+        self.itegr      = TimeIntegration(self.solver_settings['dt'], self.fields, self.physics, self.boundary)
 
         # Coordinates
         x = np.linspace(-1,1,self.numpoints)
@@ -133,11 +139,14 @@ class AnimatedScatter(object):
         self.framecount = 0
 
         # Initialize the SPH solver
-        self.solver_settings = {"h": 0.1, "n_particles": 1000, "dt": 0.05, "t_max": 1.0, 'gamma':1.4, "rho":1.169, "m":0.0001}
+        self.solver_settings = {"h": 0.1, "n_particles": 200, "dt": 0.1, "t_max": 1.0, 'gamma':1.4, "rho":1.169}
+        self.solver_settings['m'] = self.solver_settings['rho']/(self.solver_settings['n_particles']*(2*self.solver_settings['h'])**2)/500
+
         self.kernel     = Kernell('cubicspline', self.solver_settings['h'])
+        self.boundary   = Boundary()
         self.fields     = Fields(self.kernel, self.solver_settings)
-        self.physics    = Physics(self.solver_settings['gamma'])
-        self.itegr      = TimeIntegration(self.solver_settings['dt'], self.fields, self.physics)
+        self.physics    = Physics(self.solver_settings['gamma'], self.boundary)
+        self.itegr      = TimeIntegration(self.solver_settings['dt'], self.fields, self.physics, self.boundary)
         # self.X = Sobol(2).random_base2(9)-0.5
 
         self.X = self.fields.psi['x']
@@ -146,8 +155,10 @@ class AnimatedScatter(object):
         self.fig, self.ax = plt.subplots()
         # Then setup FuncAnimation.
         self.ani = animation.FuncAnimation(self.fig, self.update, interval=10,
-                                          frames=40, repeat=False,
                                           init_func=self.setup_plot, blit=True)
+        # self.ani = animation.FuncAnimation(self.fig, self.update, interval=10,
+        #                                   frames=80, repeat=False,
+        #                                   init_func=self.setup_plot, blit=True)
 
     def setup_plot(self):
         """Initial drawing of the scatter plot."""

@@ -37,10 +37,10 @@ class Boundary():
     def square(self,X):
         n = 2
 
-        x1 = self.upper(X,0.5)
-        x2 = self.lower(X,0.5)
-        x3 = self.left(X,0.5)
-        x4 = self.right(X,0.5)
+        x1 = self.upper(X,0.25)
+        x2 = self.lower(X,0.25)
+        x3 = self.left(X,0.25)
+        x4 = self.right(X,0.25)
         x5 = (x1 + x2 - (x1**n + x2**n )**(1/n))
         x6 = (x3 + x4 - (x3**n + x4**n )**(1/n))
 
@@ -213,8 +213,8 @@ class Fields():
         self.psi = { 'x':    0.5*np.random.random((solver_settings['n_particles'],2))-0.25,
                      'rho':  solver_settings['rho']*np.ones((solver_settings['n_particles'], 1)),
                      'm':    solver_settings['m']*np.ones((solver_settings['n_particles'], 1)),
-                     'u':    np.zeros((solver_settings['n_particles'],2)),
-                     'e':    0.1*np.ones((solver_settings['n_particles'], 1)),
+                     'u':    np.random.random((solver_settings['n_particles'],2))-0.5,
+                     'e':    0.1*np.random.random((solver_settings['n_particles'], 1)),
                      'mt':   np.ones((solver_settings['n_particles'], 1))}
         self.kernel = kernel
 
@@ -297,16 +297,21 @@ class Fields():
     def velocity(self,xi):
         u = self.sph('u',xi)
         return u
+    
+    def intenergy(self,xi):
+        u = self.sph('e',xi)
+        return u
 
 
 class Physics():
     """ 
     """
 
-    def __init__(self, gamma)-> None:
+    def __init__(self, gamma, boundary)-> None:
         self.gamma = gamma
+        self.boundary = boundary
 
-    def materialDerivative(self, rho, e, v, dW, mi, vi, ei, rhoi):
+    def materialDerivative(self, x, rho, e, v, dW, D, mi, vi, ei, rhoi):
         """ Returns the acceleration vector for each particle . 
         
         Arguments
@@ -314,7 +319,11 @@ class Physics():
         
         Parameters
         ----------
-        
+        delta : float
+            finite difference step size
+        epsilon : float 
+            wall hardness
+
         Returns
         -------
         
@@ -324,9 +333,20 @@ class Physics():
         
         """
 
+        delta = 0.001
+        epsilon = 0.1
+
         # a = np.array([[0,1]])*-9.81 # Gravity
 
         du = -np.sum(mi*(((self.gamma-1)*e)/rho + ((self.gamma-1)*ei)/rhoi)*dW, axis=0)
+
+        # Boundary forces
+        if D[0] <= 0:
+            dDx = (self.boundary.square(x[:, np.newaxis].T + delta*np.array([[1,0]])) - D)/delta
+            dDy = (self.boundary.square(x[:, np.newaxis].T + delta*np.array([[0,1]])) - D)/delta
+            dD = np.array([dDx, dDy])[:,0]
+
+            du = du + dD*epsilon*-np.min([0, D[0]])
 
         return du
     
@@ -355,28 +375,35 @@ class TimeIntegration():
     """ Time integration of the SPH equations.
     """ 
 
-    def __init__(self, time_step, fields, physics) -> None:
+    def __init__(self, time_step, fields, physics, boundary) -> None:
         self.time_step = time_step
         self.fields = fields
 
         self.physics = physics
+        self.boundary = boundary
 
     def leapFrog(self):
         """ 
         """ 
 
         # Field vectors
-        rho, m, x, u, e = self.fields.psi['rho'], self.fields.psi['m'], self.fields.psi['x'], self.fields.psi['u'], self.fields.psi['e']
+        m, x = self.fields.psi['m'], self.fields.psi['x']
+        rho = self.fields.density(x)
+        u   = self.fields.velocity(x)
+        e   = self.fields.intenergy(x)
 
         # Kernel
-        W   = self.fields.sph("mt",x)
+        # W   = self.fields.sph("mt",x)
         dW  = self.fields.grad_sph("mt",x)
+
+        # Boundaryies
+        D = self.boundary.square(x)[:, np.newaxis]
 
         du = []
         de = []
-        for xj, rhoj, uj, ej, mj, dWj in zip(x, rho, u, e, m, dW):
+        for xj, rhoj, uj, ej, mj, dWj, Dj in zip(x, rho, u, e, m, dW, D):
             de.append(self.physics.energyConservation(rhoj, ej, uj, dWj, m, u))
-            du.append(self.physics.materialDerivative(rhoj, ej, uj, dWj, m, u, e, rho))
+            du.append(self.physics.materialDerivative(xj, rhoj, ej, uj, dWj, Dj, m, u, e, rho))
         du = np.array(du)
         de = np.array(de)
 

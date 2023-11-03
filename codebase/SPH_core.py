@@ -16,31 +16,60 @@ Main.include("SPH.jl")
 #=======================================
 
 class Kernell():
+    """ Particle kernel class 
     """ 
-    """
-    def __init__(self, type, h) -> None:
-        if type == "cubicspline":
-            self.kernel = lambda x : self.cubicspline(x, h)
-            self.dkernel = lambda x : self.dcubicspline(x, h)
 
-        elif type == "gaussian":
+    def __init__(self, kern_type, h) -> None:
+        if kern_type == "cubicspline":
+            self.kernel     = lambda x : self.cubicspline(self.kernelValidation(x, h))
+            self.dkernel    = lambda x : self.dcubicspline(self.kernelValidation(x, h))
+
+        elif kern_type == "gaussian":
             raise NotImplementedError("Gaussian kernel not implemented")
-            self.kernel = lambda x : self.gaussian(x, h)
-            self.dkernel = lambda x : self.dgaussian(x, h)
+            self.kernel     = lambda x : self.gaussian(self.kernelValidation(x, h))
+            self.dkernel    = lambda x : self.dgaussian(self.kernelValidation(x, h))
 
-        elif type == 'triangular':
-            self.kernel = lambda x : self.triangular(x, h)
-            self.dkernel = lambda x : self.dtriangular(x, h)
+        elif kern_type == 'triangular':
+            self.kernel     = lambda x : self.triangular(self.kernelValidation(x, h))
+            self.dkernel    = lambda x : self.dtriangular(self.kernelValidation(x, h))
 
         else:
-            raise NotImplementedError("Kernel not implemented")
+            raise NotImplementedError(f" '{kern_type}' kernel not implemented")
+        
+    def kernelValidation(self, r, h):
+        """ Performs tests on the inputs . 
+        """ 
+
+        assert np.all(r >= 0),  "r must be in [0,inf)"
+        assert h > 0,           "h must be in (0,inf)"
+
+        return r, h
 
     def triangular(self, r, h):
+        """ Returns the triangular kernel value. 
+        
+        Arguments
+        ----------
+        r: float
+            Distance between evaluation and kernel center
+        h: float
+            Smoothing length
+        
+        Parameters
+        ----------
+        
+        Returns
+        -------
+        y: float
+            Kernel value
+        
+        Notes
+        ----- 
+        This kernel is not smooth. 
+        
+        """ 
 
         x = r/h
-        assert np.all(x >= 0), "x must be in [0,inf)"
-        assert h > 0, "h must be in (0,inf)"
-
         y = np.zeros_like(x)
 
         # Interval 1
@@ -53,39 +82,51 @@ class Kernell():
 
         return y
 
-
     def dtriangular(self, r, h):
-
+        """ Returns the derivative of the triangular kernel value. 
+        
+        Arguments
+        ----------
+        r: float
+            Distance between evaluation and kernel center
+        h: float
+            Smoothing length
+        
+        Parameters
+        ----------
+        
+        Returns
+        -------
+        dy: float
+            Kernel value
+        
+        Notes
+        ----- 
+        This kernel is not smooth. 
+        
+        """ 
+        
         x = r/h
-        assert np.all(x >= 0), "x must be in [0,inf)"
-        assert h > 0, "h must be in (0,inf)"
-
-        y = np.zeros_like(x)
+        dy = np.zeros_like(x)
 
         # Interval 1
         a = np.where((0 <= x )*( x < 1))
-        y[a] = -1
+        dy[a] = -1
 
         # Interval 2
         c = np.where(1 <= x)
-        y[c] = 0
+        dy[c] = 0
 
-        return y
+        return dy
 
     def gaussian(self, r, h):
         x = r/h
-        assert np.all(x >= 0), "x must be in [0,inf)"
-        assert h > 0, "h must be in (0,inf)"
-
         y = 1/(np.pi**(3/2)*h**3)*np.exp(-x**2)
 
         return y
 
     def dgaussian(self, r, h):
         x = r/h
-        assert np.all(x >= 0), "x must be in [0,inf)"
-        assert h > 0, "h must be in (0,inf)"
-
         y = -2*x*np.exp(-x**2)
 
         return y
@@ -93,9 +134,6 @@ class Kernell():
     def cubicspline(self, r, h):
         
         x = r/h
-        assert np.all(x >= 0), "x must be in [0,inf)"
-        assert h > 0, "h must be in (0,inf)"
-
         y = np.zeros_like(x)
 
         # Interval 1
@@ -115,9 +153,6 @@ class Kernell():
     def dcubicspline(self, r, h):
         
         x = r/h
-        assert np.all(x >= 0), "x must be in [0,inf)"
-        assert h > 0, "h must be in (0,inf)"
-
         y = np.zeros_like(x)
 
         # Interval 1
@@ -134,7 +169,7 @@ class Kernell():
 
         return y
     
-    
+
 class Fields():
     """ 
     """

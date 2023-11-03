@@ -14,6 +14,7 @@ Main.include("SPH.jl")
 #=======================================
 # Core code
 #=======================================
+
 class Kernell():
     """ 
     """
@@ -132,3 +133,64 @@ class Kernell():
         y[c] = 0
 
         return y
+    
+    
+class Fields():
+    """ 
+    """
+
+    def __init__(self, kernel) -> None:
+
+        self.psi = { 'x':    0.5*np.random.random((solver_settings['n_particles'],2))-0.25,
+                     'rho':  np.ones(solver_settings['n_particles'], 1),
+                     'm':    np.ones(solver_settings['n_particles'], 1),
+                     'u':    np.random.random((solver_settings['n_particles'],2)),
+                     'p':    np.zeros(solver_settings['n_particles'], 1)}
+        self.kernel = kernel
+
+    def sph(self, fld, xi):
+        
+        phi = 0.0
+        for m, rho, x, fld in zip(self.psi['m'],self.psi['rho'],self.psi['x'],self.psi[fld]):
+
+            phi = phi + m/rho*fld*kernel.kernel(np.linalg.norm(xi-x, axis=1))
+
+        return phi
+
+    def grad_sph(self, fld, xi):
+
+        n = xi/np.linalg.norm(xi, axis=1)[:,None]
+        phi = 0.0
+        for m, rho, x, fld in zip(self.psi['m'],self.psi['rho'],self.psi['x'],self.psi[fld]):
+
+            phi = phi + m/rho*fld*kernel.dkernel(np.linalg.norm(xi-x, axis=1))
+
+        return np.tile(phi[np.newaxis,:],(2,1)).T*n
+
+    def div_sph(self, fld, xi):
+
+        n = xi/np.linalg.norm(xi, axis=1)[:,None]
+        phi = 0.0
+        for m, rho, x, fld in zip(self.psi['m'],self.psi['rho'],self.psi['x'],self.psi[fld]):
+            fld     = fld[np.newaxis,:]
+            dkern    = np.tile(kernel.dkernel(np.linalg.norm(xi-x, axis=1))[np.newaxis,:],(2,1)).T*n
+            phi     = phi + (m/rho) * fld @ (dkern.T)
+
+        return phi
+
+    # def curl_sph(self, fld, xi):
+
+    #     phi = 0.0
+    #     for m, rho, x, fld in zip(self.psi['m'],self.psi['rho'],self.psi['x'],self.psi[fld]):
+
+    #         phi = phi + m/rho*fld*kernel.kernel(np.linalg.norm(xi-x, axis=1))
+
+    #     return phi
+
+    def density(self,xi):
+        rho = self.sph('rho',xi)
+        return rho
+
+    def velocity(self,xi):
+        u = self.sph('u',xi)
+        return u

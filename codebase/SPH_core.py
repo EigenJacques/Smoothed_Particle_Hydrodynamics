@@ -328,4 +328,29 @@ class Physics():
 
         return a
 
+class TimeIntegration():
+    """ Time integration of the SPH equations.
+    """ 
 
+    def __init__(self, time_step, fields, physics) -> None:
+        self.time_step = time_step
+        self.fields = fields
+
+        self.physics = physics
+
+    def leapFrog(self):
+        """ 
+        """ 
+
+        x, u = self.fields.psi['x'], self.fields.psi['u']
+
+        A = []
+        for xi in xi:
+            A.append(self.physics.materialDerivative(xi))
+        A = np.array(A)
+
+        x = x + self.time_step*u
+        u = u + self.time_step*A
+
+        self.fields.psi['x'] = x
+        self.fields.psi['u'] = u

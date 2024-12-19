@@ -16,35 +16,50 @@ from scipy.stats.qmc import Sobol
 from SPH_core import Kernell, Boundary, Fields, Physics, TimeIntegration
 
 # %%
-solver_settings = {"h": 0.1, "n_particles": 100, "dt": 0.0005, "t_max": 1.0, 'gamma':1.4, "rho":1, "m":0.001}
-kernel      = Kernell('cubicspline', solver_settings['h'])
-boundary    = Boundary()
-fields      = Fields(kernel, solver_settings)
-physics     = Physics(solver_settings['gamma'], boundary)
-itegr       = TimeIntegration(solver_settings['dt'], fields, physics, boundary)
+solver_settings = {"h": 0.1, 
+                   "n_particles": 100, 
+                   "dt": 0.001, 
+                   "t_max": 1.0, 
+                   'gamma':1.4, 
+                   "rho":1, 
+                   "m":0.001}
 
-itegr.leapFrog()
-
-# %timeit itegr.leapFrog()
 # %%
 #==================================
 # Static test
 #==================================
-plt.figure()
 
+# Initialise kernel functions
+kernel      = Kernell('cubicspline', solver_settings['h'])
+
+# Create boundaryies
+boundary    = Boundary()
+
+# Initialise property fields, physics equations and integrator
+fields      = Fields(kernel, solver_settings)
+physics     = Physics(solver_settings['gamma'], boundary)
+itegr       = TimeIntegration(solver_settings['dt'], fields, physics, boundary)
+
+# Create coordinates
 x = np.linspace(-1,1,100)
 y = np.linspace(-1,1,100)
 x, y = np.meshgrid(x, y)
 X = np.vstack((x.flatten(),y.flatten())).T
 
+# Initialise density 
 Y = fields.density(X)
+E = fields.psi['e']
+
+# Plot initialized density
+plt.figure()
 sc = plt.pcolormesh(x,y,Y[:,0].reshape(100,100))
 plt.xlim(-0.5,0.5)
 plt.ylim(-0.5,0.5)
 plt.colorbar(sc)
 
+# Update 10 iteration steps and plot again
 plt.figure()
-for i in range(3):
+for i in range(10):
     itegr.leapFrog()
 Y = fields.density(X)
 sc = plt.scatter(X[:,0],X[:,1], c=Y)
@@ -67,19 +82,20 @@ plt.colorbar(sc)
 #==================================
 class AnimatedScatter(object):
     """An animated scatter plot using matplotlib.animations.FuncAnimation."""
-    def __init__(self, numpoints=30):
+    def __init__(self, numpoints=80):
         self.numpoints = numpoints
         self.stream = self.data_stream()
 
         # Initialize the SPH solver
-        self.solver_settings = {"h": 0.1, "n_particles": 200, "dt": 0.1, "t_max": 1.0, 'gamma':1.4, "rho":1.169, "m":1}
-        self.solver_settings['m'] = self.solver_settings['rho']/(self.solver_settings['n_particles']*(2*self.solver_settings['h'])**2)/1000
+        self.solver_settings = {"h": 0.1, "n_particles": 100, "dt": 0.1, "t_max": 1.0, 'gamma':1.4, "rho":1.169}
+        self.solver_settings['m'] = self.solver_settings['rho']/(self.solver_settings['n_particles']*(2*self.solver_settings['h'])**2)/900
 
         self.kernel     = Kernell('cubicspline', self.solver_settings['h'])
         self.boundary   = Boundary()
         self.fields     = Fields(self.kernel, self.solver_settings)
         self.physics    = Physics(self.solver_settings['gamma'], self.boundary)
         self.itegr      = TimeIntegration(self.solver_settings['dt'], self.fields, self.physics, self.boundary)
+        # self.X = Sobol(2).random_base2(9)-0.5
 
         # Coordinates
         x = np.linspace(-1,1,self.numpoints)
@@ -133,14 +149,20 @@ if __name__ == '__main__':
 #==================================
 class AnimatedScatter(object):
     """An animated scatter plot using matplotlib.animations.FuncAnimation."""
-    def __init__(self, numpoints=30):
+    def __init__(self, numpoints=40):
         self.numpoints = numpoints
         self.stream = self.data_stream()
         self.framecount = 0
 
         # Initialize the SPH solver
-        self.solver_settings = {"h": 0.1, "n_particles": 200, "dt": 0.1, "t_max": 1.0, 'gamma':1.4, "rho":1.169}
-        self.solver_settings['m'] = self.solver_settings['rho']/(self.solver_settings['n_particles']*(2*self.solver_settings['h'])**2)/500
+        self.solver_settings = {"h": 0.1, 
+                                "n_particles": 200, 
+                                "dt": 0.1, 
+                                "t_max": 1.0, 
+                                'gamma':1.4, 
+                                "rho":1.169}
+        
+        self.solver_settings['m'] = self.solver_settings['rho']/(self.solver_settings['n_particles']*(2*self.solver_settings['h'])**2)/1000
 
         self.kernel     = Kernell('cubicspline', self.solver_settings['h'])
         self.boundary   = Boundary()
@@ -162,9 +184,11 @@ class AnimatedScatter(object):
 
     def setup_plot(self):
         """Initial drawing of the scatter plot."""
-        X, Y, U = next(self.stream)
-        self.scat = self.ax.scatter(X[:,0],X[:,1], c=U, vmin=0, vmax=0.3, cmap="jet", edgecolor="k")
+        X, Y, E = next(self.stream)
+        E_total = np.sum(E)
+        self.scat = self.ax.scatter(X[:,0],X[:,1], c=E, cmap="jet", edgecolor="k")
         self.ax.axis([-0.5, 0.5, -0.5, 0.5])
+        self.ax.set_title('{}'.format(E_total))
         # For FuncAnimation's sake, we need to return the artist we'll be using
         # Note that it expects a sequence of artists, thus the trailing comma.
         return self.scat,
@@ -176,8 +200,9 @@ class AnimatedScatter(object):
             self.itegr.leapFrog()
             X = self.fields.psi['x']
             Y = self.fields.psi['rho']
-            U = np.linalg.norm(self.fields.psi['u'], axis=1)
-            yield X, Y, U
+            # U = np.linalg.norm(self.fields.psi['u'], axis=1)
+            E = self.fields.psi['e'][:,0]
+            yield X, Y, E
 
     def update(self, i):
         """Update the scatter plot."""
@@ -188,6 +213,11 @@ class AnimatedScatter(object):
 
         # Set colors..
         self.scat.set_array(data[2])
+
+        # Set title
+        E = data[2]
+        E_total = np.sum(E)
+        self.ax.set_title('{}'.format(E_total))
 
         # We need to return the updated artist for FuncAnimation to draw..
         # Note that it expects a sequence of artists, thus the trailing comma.

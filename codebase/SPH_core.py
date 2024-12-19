@@ -5,10 +5,10 @@
 import numpy as np
 
 from matplotlib import pyplot as plt
-import matplotlib.cm     as cm
+import matplotlib.cm as cm
 
-from juliacall import Main
-Main.include("SPH.jl")
+# from juliacall import Main
+# Main.include("SPH.jl")
 
 #%%
 #=======================================
@@ -20,7 +20,8 @@ class Boundary():
     """ 
 
     def __init__(self) -> None:
-        pass
+        self.boundary_force         = 10
+        self.boundary_sharpness     = 2
 
     def upper(self,X, a):
         return -X[:,1] + a
@@ -35,7 +36,8 @@ class Boundary():
         return -X[:,0] + a
 
     def square(self,X):
-        n = 2
+
+        n = self.boundary_sharpness
 
         x1 = self.upper(X,0.25)
         x2 = self.lower(X,0.25)
@@ -44,11 +46,11 @@ class Boundary():
         x5 = (x1 + x2 - (x1**n + x2**n )**(1/n))
         x6 = (x3 + x4 - (x3**n + x4**n )**(1/n))
 
-        return x5 + x6 - (x5**n + x6**n)**(1/n)
+        return self.boundary_force*(x5 + x6 - (x5**n + x6**n)**(1/n))
     
 
 class Kernell():
-    """ Particle kernel class 
+    """ Particle kernel class. 
     """ 
 
     def __init__(self, kern_type, h) -> None:
@@ -208,13 +210,35 @@ class Fields():
     """ 
     """
 
-    def __init__(self, kernel, solver_settings) -> None:
+    def __init__(self, kernel:object, solver_settings:dict) -> None:
+        ''' 
+        Arguments
+        ----------
+        * kernel
+        * sover_settings
+
+        Parameters
+        ----------
+        psi:    x :     coorinate locations of particles
+                rho:    density of particle
+                m:      mass of particle
+                u:      velocity of particle
+                e:      internal energy of particle
+                mt:     
+
+        Returns
+        -------
+
+        
+        Notes
+        ----- 
+        '''
 
         self.psi = { 'x':    0.5*np.random.random((solver_settings['n_particles'],2))-0.25,
                      'rho':  solver_settings['rho']*np.ones((solver_settings['n_particles'], 1)),
                      'm':    solver_settings['m']*np.ones((solver_settings['n_particles'], 1)),
-                     'u':    np.random.random((solver_settings['n_particles'],2))-0.5,
-                     'e':    0.1*np.random.random((solver_settings['n_particles'], 1)),
+                     'u':    np.zeros((solver_settings['n_particles'],2)),
+                     'e':    0.1*np.ones((solver_settings['n_particles'], 1)),
                      'mt':   np.ones((solver_settings['n_particles'], 1))}
         self.kernel = kernel
 
@@ -346,7 +370,8 @@ class Physics():
             dDy = (self.boundary.square(x[:, np.newaxis].T + delta*np.array([[0,1]])) - D)/delta
             dD = np.array([dDx, dDy])[:,0]
 
-            du = du + dD*epsilon*-np.min([0, D[0]])
+            # du = du                                   # no boundary force
+            du = du + dD*epsilon*-np.min([0, D[0]])     # add boundary force
 
         return du
     
@@ -371,6 +396,7 @@ class Physics():
 
         return de
 
+
 class TimeIntegration():
     """ Time integration of the SPH equations.
     """ 
@@ -384,13 +410,15 @@ class TimeIntegration():
 
     def leapFrog(self):
         """ 
+
         """ 
 
         # Field vectors
-        m, x = self.fields.psi['m'], self.fields.psi['x']
-        rho = self.fields.density(x)
-        u   = self.fields.velocity(x)
-        e   = self.fields.intenergy(x)
+        m   = self.fields.psi['m']
+        x   = self.fields.psi['x']
+        rho = self.fields.psi['rho']
+        u   = self.fields.psi['u']
+        e   = self.fields.psi['e']
 
         # Kernel
         # W   = self.fields.sph("mt",x)
@@ -414,3 +442,6 @@ class TimeIntegration():
         self.fields.psi['x'] = x
         self.fields.psi['u'] = u
         self.fields.psi['e'] = e
+
+
+# %%

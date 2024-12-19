@@ -1,6 +1,9 @@
 
 function rectangle(X)
 
+    x, y = X[1], X[2]
+    x = x'
+
     # Domain boundaries 
     function upper(X, a)
         return -X[2] .+ a
@@ -25,6 +28,7 @@ function rectangle(X)
     x2 = lower(X,0.5)
     x3 = left(X,0.5)
     x4 = right(X,0.5)
+
     x5 = (x1 .+ x2 .- (x1.^n .+ x2.^n ).^(1/n))
     x6 = (x3 .+ x4 .- (x3.^n .+ x4.^n ).^(1/n))
 
@@ -32,15 +36,8 @@ function rectangle(X)
 
 end
 
-using Plots
-
-x = range(-1, 1, length=100)
-y = range(-1, 1, length=100)
-
-z = rectangle([x',y])
-
-contour(x,y,z, levels=[0], color=:turbo, cbar=false, lw=1)
-
-using BenchmarkTools
-@benchmark rectangle([x',y])
-
+# x = range(-1, 1, length=100)
+# y = range(-1, 1, length=100)
+# z = rectangle([x',y])
+# using BenchmarkTools
+# @benchmark rectangle([x',y])
